@@ -1,0 +1,24 @@
+# Test for https://github.com/jacksontj/promxy/issues/707
+#
+# A BinaryExpr with no vector matching (here a scalar function against a
+# selector) is pushed down whole by the NodeReplacer. With metrics_relabel
+# configured the relabel visitor has to be able to rewrite the selectors
+# inside it; before it refused and the downstream was never queried.
+#
+# The aggregations below drop all labels, so the expected results are the
+# same whether or not a metrics_relabel config is in play.
+load 5m
+    server_start_ts{prometheus_replica="a", host="h1"} 100+0x10
+    server_start_ts{prometheus_replica="b", host="h1"} 100+0x10
+
+eval instant at 10m max(time() - min_over_time(server_start_ts[1m]))
+    {} 500
+
+eval instant at 10m min(time() - min_over_time(server_start_ts[1m]))
+    {} 500
+
+eval instant at 10m max(time() - server_start_ts)
+    {} 500
+
+eval instant at 10m sum(server_start_ts > 0)
+    {} 400

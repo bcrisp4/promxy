@@ -1,0 +1,7 @@
+load 5m
+  server_start_ts{__tenant_id__="a", host="h1", service="backend_reader"} 100+0x10
+  server_start_ts{__tenant_id__="b", host="h2", service="backend_reader"} 200+0x10
+  dup_ts{__tenant_id__="a", host="h1"} 100+0x10
+  dup_ts{__tenant_id__="b", host="h1"} 200+0x10
+  lhs_ts{host="h1"} 7+0x10
+  rhs_ts{__tenant_id__="x", host="h1"} 3+0x10

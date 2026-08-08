@@ -396,11 +396,23 @@ func (v *MetricsRelabelVisitor) Visit(node parser.Node, path []parser.Node) (w p
 	case *parser.AggregateExpr:
 		nodeTyped.Grouping = RewriteLabels(v.MetricsRelabelConfigs, nodeTyped.Grouping)
 	case *parser.BinaryExpr:
-		// If one is a literal; then it is safe to traverse
-		if ExprIsLiteral(nodeTyped.LHS) || ExprIsLiteral(nodeTyped.RHS) {
+		// Unless both sides are instant vectors there is no vector matching --
+		// no on()/ignoring() or group_left()/group_right() label list to
+		// reverse -- so it is safe to traverse: the selectors on either side
+		// are rewritten by their own cases. This covers literals (`foo > 1`)
+		// as well as scalar-vector shapes such as `time() - foo`, which
+		// proxystorage sends down whole whenever it serialises a subtree into a
+		// single query -- via a reentrant aggregation, a Call, or a subquery.
+		//
+		// Vector-to-vector operations fall through to the error below. Their
+		// matching labels cannot be faithfully reversed: RewriteLabels can
+		// rename or delete a label but never append one, and for implicit
+		// matching (`foo + bar`, on every label but __name__) a dropped label
+		// silently changes the match set.
+		if nodeTyped.LHS.Type() != parser.ValueTypeVector || nodeTyped.RHS.Type() != parser.ValueTypeVector {
 			return v, nil
 		}
-		return nil, fmt.Errorf("metricsrelabelvisitor does not support BinaryExprs")
+		return nil, fmt.Errorf("metricsrelabelvisitor does not support BinaryExprs with vector matching (any vector-to-vector operation: set operators, explicit on/ignoring/group_left/group_right, or the implicit matching of e.g. `foo + bar`)")
 	}
 
 	return v, nil
